@@ -44,10 +44,9 @@ targeted = args.targeted
 if args.fgsm:
     attacker = attack_util.FGSMAttack(eps = eps, loss_type = loss_type, targeted = targeted, num_classes = num_classes, norm = 'linf')
 else:
-    attacker = attack_util.PGDAttack(step = attack_step, eps = eps, restart = restart, alpha = alpha, 
+    attacker = attack_util.PGDAttack(step = attack_step, eps = eps, alpha = alpha, 
                                     loss_type = loss_type, targeted = targeted, num_classes = num_classes, 
                                     norm = 'linf', fgsm = fgsm)
-
 
 ### Your code ends
 
@@ -62,6 +61,7 @@ model.eval()
 
 for data, labels in tqdm(test_loader):
     data = data.float().to(device)
+    labels = labels.to(device)
     if targeted:
         data_mask = (labels != target_label)
         if data_mask.sum() == 0:

@@ -52,37 +52,58 @@ class PGDAttack():
 
 
     def ce_loss(self, logits, ys, reduction = 'none'):
-        ### Your code here
 
-        ### Your code ends
-        raise NotImplementedError
+        loss = F.cross_entropy(logits, ys)
+        return loss
+
 
     def cw_loss(self, logits, ys, reduction = 'none'):
-        ### Your code here
+        loss = self.margin(logits, ys)
+        raise loss
 
-        ### Your code ends
-        raise NotImplementedError
+    def cw_margin(self, logits, y, delta, targeted=False):
+        if targeted:
+            return torch.sum(torch.max(torch.zeros(logits.size()), 
+                logits[range(logits.size(0)), y] - logits + delta))
+        else: 
+            return torch.sum(torch.max(torch.zeros(logits.size()), 
+                logits - logits[range(logits.size(0)), y] + delta))
 
-    def clamp(self, delta, lower, upper):
-        ### Your code here
 
-        ### Your code ends
-        raise NotImplementedError
+    # def clamp(self, delta, lower, upper):
+    #     ### Your code here
 
-    def linf_proj(self, delta):
-        ### Your code here
+    #     ### Your code ends
+    #     raise NotImplementedError
 
-        ### Your code ends
-        raise NotImplementedError
+    # def linf_proj(self, delta):
+    #     ### Your code here
 
-    def perturb(self, model: nn.Module, Xs, ys):
-        delta = torch.ones_like(Xs)
+    #     ### Your code ends
+    #     raise NotImplementedError
+
+    def perturb(self, model, Xs, ys):
+        # x_adv = torch.ones_like(Xs)
+        x_adv = Xs.detach().clone()
         for iter_idx in range(self.attack_step):
-            ### Your code here
+            x_adv.requires_grad=True
+            model.zero_grad()
+            logits = model(x_adv)
 
-            ### Your code ends
-            pass
-        return delta
+            # loss type
+            if self.loss_type == 'ce':
+                loss = self.ce_loss(logits, ys)
+            elif self.loss_type == 'cw':
+                loss = self.cw_loss(logits, ys)
+            else: 
+                raise NotImplementedError
+            loss.backward()
+
+            grad = x_adv.grad.detach()
+            grad = grad.sign()
+            x_adv = x_adv.detach() - self.alpha/255 * grad
+
+        return x_adv
 
 
 
@@ -100,10 +121,21 @@ class FGSMAttack():
         self.norm = norm
 
     def perturb(self, model: nn.Module, Xs, ys):
-        delta = torch.ones_like(Xs)
-        ### Your code here
+        # delta = torch.ones_like(Xs)
+        delta = Xs.detach().clone()
+        delta.requires_grad=True
+        model.zero_grad()
 
-        ### Your code ends
-        pass
-        return delta        
+        out = model(delta)
+
+
+        loss = F.cross_entropy(out, ys)
+
+        if delta.grad is not None:
+            delta.grad.data.fill_(0)
+        loss.backward()
+        delta = delta.detach() - self.eps * delta.grad.sign()        
+        delta = torch.clamp(delta, *self.clamp)
+
+        return delta   
 

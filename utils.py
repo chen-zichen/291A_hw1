@@ -17,7 +17,7 @@ class CWloss():
         loss_out = self.margin(logits, labels, targeted=self.target)
         return nn.ReLU(loss_out)
     
-    def margin(self, logits, y, delta, targeted=False):
+    def margin(self, logits, y, targeted=False):
         """
         :param logits: A tensor of shape [N, C] representing the
         logits output from the classifier.
@@ -30,7 +30,7 @@ class CWloss():
         """
         if targeted:
             return torch.sum(torch.max(torch.zeros(logits.size()).cuda(), 
-                logits[range(logits.size(0)), y] - logits + delta))
+                logits[range(logits.size(0)), y] - logits))
         else:
             return torch.sum(torch.max(torch.zeros(logits.size()).cuda(), 
-                logits - logits[range(logits.size(0)), y] + delta))
+                logits - logits[range(logits.size(0)), y]))
