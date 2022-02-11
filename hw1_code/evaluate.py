@@ -8,8 +8,8 @@ from tqdm import tqdm
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--eps", type = int, default = 8)
-parser.add_argument("--alpha", type = float, default = 8)
+parser.add_argument("--eps", type = float, default = 8.0)
+parser.add_argument("--alpha", type = float, default = 2.0)
 parser.add_argument("--attack_rs", type = int, default = 1)
 parser.add_argument("--attack_step", type = int, default = 10)
 parser.add_argument("--loss_type", type = str, default = "ce", choices = ['ce','cw'])
@@ -33,9 +33,9 @@ model.load(model_path)
 model = model.to(device)
 
 attack_step = args.attack_step
-eps = args.eps / 255
+eps = args.eps / 255.
 restart = args.attack_rs
-alpha = args.alpha
+alpha = args.alpha / 255.
 fgsm = args.fgsm
 loss_type = args.loss_type
 targeted = args.targeted

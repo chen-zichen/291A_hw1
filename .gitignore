@@ -2,3 +2,4 @@ data/**
 __pycache__/**
 .DS_Store
 hw1_code/data/**
+hw1_code/__pycache__/**

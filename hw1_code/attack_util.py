@@ -1,3 +1,4 @@
+from urllib.response import addbase
 import numpy as np
 import torch
 import torch.nn as nn
@@ -50,60 +51,56 @@ class PGDAttack():
         self.norm = norm
         self.fgsm = fgsm
 
-
-    def ce_loss(self, logits, ys, reduction = 'none'):
-
+    def ce_loss(self, logits, ys):
         loss = F.cross_entropy(logits, ys)
+        if not self.targeted:
+            loss = -loss
         return loss
 
+    def cw_loss(self, logits, ys, x_adv, Xs):
+        # loss = 0.* F.mse_loss(x_adv, Xs) + self.cw_margin(logits, ys, targeted=self.targeted)
+        loss = self.cw_margin(logits, ys, targeted=self.targeted)
+        return loss
 
-    def cw_loss(self, logits, ys, reduction = 'none'):
-        loss = self.margin(logits, ys)
-        raise loss
+    def cw_margin(self, logits, y, tau=0., targeted=False):
+        one_hot_labels = torch.eye(len(logits[0]))[y].to(y)
+        second, _ = torch.max((1-one_hot_labels)*logits, dim=1)
+        first = torch.masked_select(logits, one_hot_labels.bool())
 
-    def cw_margin(self, logits, y, delta, targeted=False):
         if targeted:
-            return torch.sum(torch.max(torch.zeros(logits.size()), 
-                logits[range(logits.size(0)), y] - logits + delta))
+            return torch.relu(second - first + tau).mean()
         else: 
-            return torch.sum(torch.max(torch.zeros(logits.size()), 
-                logits - logits[range(logits.size(0)), y] + delta))
+            return torch.relu(first - second + tau).mean()
 
-
-    # def clamp(self, delta, lower, upper):
-    #     ### Your code here
-
-    #     ### Your code ends
-    #     raise NotImplementedError
-
-    # def linf_proj(self, delta):
-    #     ### Your code here
-
-    #     ### Your code ends
-    #     raise NotImplementedError
+    def linf_proj(self, x, adv_x):
+        adv_x = x + torch.clamp(adv_x - x, min=-self.eps, max=self.eps)
+        raise adv_x
 
     def perturb(self, model, Xs, ys):
-        # x_adv = torch.ones_like(Xs)
-        x_adv = Xs.detach().clone()
-        for iter_idx in range(self.attack_step):
-            x_adv.requires_grad=True
+
+        delta = torch.empty_like(Xs).uniform_(-self.eps, self.eps)
+        x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
+
+        for _ in range(self.attack_step):
+            x_adv.requires_grad = True
             model.zero_grad()
             logits = model(x_adv)
 
-            # loss type
+            # Calculate loss
             if self.loss_type == 'ce':
                 loss = self.ce_loss(logits, ys)
             elif self.loss_type == 'cw':
-                loss = self.cw_loss(logits, ys)
+                loss = self.cw_loss(logits, ys, x_adv, Xs)
             else: 
                 raise NotImplementedError
             loss.backward()
 
-            grad = x_adv.grad.detach()
-            grad = grad.sign()
-            x_adv = x_adv.detach() - self.alpha/255 * grad
+            x_adv = x_adv.detach() - self.alpha*x_adv.grad.sign()
+            
+            delta = torch.clamp(x_adv - Xs, min=-self.eps, max=self.eps)
+            x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
 
-        return x_adv
+        return x_adv - Xs
 
 
 
@@ -121,21 +118,19 @@ class FGSMAttack():
         self.norm = norm
 
     def perturb(self, model: nn.Module, Xs, ys):
-        # delta = torch.ones_like(Xs)
-        delta = Xs.detach().clone()
-        delta.requires_grad=True
+        Xs = Xs.clone()
+        Xs.requires_grad=True
         model.zero_grad()
 
-        out = model(delta)
+        logits = model(Xs)
 
+        loss = F.cross_entropy(logits, ys)
+        if self.targeted:
+            loss = -loss
 
-        loss = F.cross_entropy(out, ys)
-
-        if delta.grad is not None:
-            delta.grad.data.fill_(0)
         loss.backward()
-        delta = delta.detach() - self.eps * delta.grad.sign()        
-        delta = torch.clamp(delta, *self.clamp)
+        x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()    
+        x_adv = torch.clamp(x_adv, min=0, max=1).detach()
 
-        return delta   
+        return x_adv - Xs 
 
