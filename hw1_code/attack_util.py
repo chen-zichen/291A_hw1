@@ -72,9 +72,6 @@ class PGDAttack():
         else: 
             return torch.relu(first - second + tau).mean()
 
-    def linf_proj(self, x, adv_x):
-        adv_x = x + torch.clamp(adv_x - x, min=-self.eps, max=self.eps)
-        raise adv_x
 
     def perturb(self, model, Xs, ys):
 
