@@ -2,6 +2,7 @@
 python3 evaluate.py --model_name resnet_cifar10.pth
 python3 evaluate.py --model_name pgd10_eps8.pth
 
+# standard model version
 # 2. fgsm + untargeted ce
 python3 evaluate.py --model_name resnet_cifar10.pth
 
@@ -17,7 +18,3 @@ python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 10 --loss_type
 # 6. pgd + ce + different settings... example
 python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 20 --loss_type ce 
 python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 10 --loss_type ce --eps 1
-
-
-
-
