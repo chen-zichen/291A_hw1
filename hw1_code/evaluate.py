@@ -1,3 +1,4 @@
+from cProfile import label
 import torch
 import data_util
 import model_util
@@ -63,24 +64,35 @@ for data, labels in tqdm(test_loader):
     data = data.float().to(device)
     labels = labels.to(device)
     if targeted:
+        # set false to these (data label ≠ target label) 
         data_mask = (labels != target_label)
-        if data_mask.sum() == 0:
-            continue
+        # data shape: 61 3 32 32 
+        # masked data/labels
         data = data[data_mask]
         labels = labels[data_mask]
+        # copy label shape 
         attack_labels = torch.ones_like(labels).to(device)
     else:
         attack_labels = labels
     attack_labels = attack_labels.to(device)
+    # number of data
     batch_size = data.size(0)
+
+    # for final calculation 
     total += batch_size
     with ctx_noparamgrad(model):
-        ### generate perturbation
+        # no grad
+        # generate perturbation
+        # perturbed_data + original data (image)
         perturbed_data = attacker.perturb(model, data, attack_labels) + data
 
+        # clean model acc
         predictions = model(data)
+        # predictions shape bs x c
+        # argmax keep the bs x 1 to match the 'real labels'
         clean_correct_num += torch.sum(torch.argmax(predictions, dim = -1) == labels).item()
 
+        # robust acc 
         predictions = model(perturbed_data)
         robust_correct_num += torch.sum(torch.argmax(predictions, dim = -1) == labels).item()
 

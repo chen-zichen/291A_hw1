@@ -7,8 +7,10 @@ import torch.nn.functional as F
 ### Do not modif the following codes
 class ctx_noparamgrad(object):
     def __init__(self, module):
+        # get_param_grad_state for set_param_grad_state func, need prev state
         self.prev_grad_state = get_param_grad_state(module)
         self.module = module
+        # set parm in module no grad
         set_param_grad_off(module)
 
     def __enter__(self):
@@ -51,52 +53,83 @@ class PGDAttack():
         self.norm = norm
         self.fgsm = fgsm
 
-    def ce_loss(self, logits, ys):
+    def ce_loss(self, logits: torch.float, ys: torch.int):
+        # logits: outputs of model(x), ys: label of xs 
+        # ys shape: bs x 1
+        # logits shape: bs x 10
         loss = F.cross_entropy(logits, ys)
         if not self.targeted:
             loss = -loss
         return loss
 
-    def cw_loss(self, logits, ys, x_adv, Xs):
-        # loss = 0.* F.mse_loss(x_adv, Xs) + self.cw_margin(logits, ys, targeted=self.targeted)
+    def cw_loss(self, logits: torch.float, ys: torch.int):
+        # logits: outputs of model(x), ys: label of xs 
+        # ys shape: bs x 1
+        # logits shape: bs x 10
         loss = self.cw_margin(logits, ys, targeted=self.targeted)
         return loss
 
-    def cw_margin(self, logits, y, tau=0., targeted=False):
-        one_hot_labels = torch.eye(len(logits[0]))[y].to(y)
-        second, _ = torch.max((1-one_hot_labels)*logits, dim=1)
-        first = torch.masked_select(logits, one_hot_labels.bool())
+    def cw_margin(self, logits: torch.float, ys: torch.int, tau=0., targeted=False):
+        # logits: outputs of model(x), ys: label of xs
+        # one on to the diagonal,rest is 0: c x c
+
+        # one hot label
+        # the victime label will be assigned class [1], others are 0
+        one_hot_labels = F.one_hot(ys, num_classes=10).to(ys)
+
+        # get each logits'wrong score
+        wrong_logit, _ = torch.max((1-one_hot_labels)*logits, dim=1)
+
+        # only get targeted confidence score
+        correct_logit = torch.masked_select(logits, one_hot_labels.bool())
 
         if targeted:
-            return torch.relu(second - first + tau).mean()
+            # loss = -(correct - wrong)
+            return torch.relu(wrong_logit - correct_logit + tau).mean()
         else: 
-            return torch.relu(first - second + tau).mean()
+            # loss = correct - wrong
+            return torch.relu(correct_logit - wrong_logit + tau).mean()
 
 
-    def perturb(self, model, Xs, ys):
-
+    def perturb(self, model:nn.Module, Xs: torch.float, ys: torch.int):
+        """
+        model: resnet18
+        Xs: data - image input, shape: bs 3 32 32  
+        ys: attack_labels. (targeted=1)
+        """
+        # delta: pertubation, shape: bs 3 32 32, range [-eps,eps]
         delta = torch.empty_like(Xs).uniform_(-self.eps, self.eps)
+
+        # x_adv: adverserial input, norm
         x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
 
         for _ in range(self.attack_step):
+            # set x_adv grad
             x_adv.requires_grad = True
+            # eval model
             model.zero_grad()
+            # logits is the output of model with adverserial input
+            # logits shape: bs x c [64,10]
             logits = model(x_adv)
+            
 
             # Calculate loss
             if self.loss_type == 'ce':
                 loss = self.ce_loss(logits, ys)
             elif self.loss_type == 'cw':
-                loss = self.cw_loss(logits, ys, x_adv, Xs)
+                loss = self.cw_loss(logits, ys)
             else: 
                 raise NotImplementedError
             loss.backward()
 
+            # update adverserial input with adverserial input grad sign
             x_adv = x_adv.detach() - self.alpha*x_adv.grad.sign()
             
+            # update pertubation delta, min(delta), with norm
             delta = torch.clamp(x_adv - Xs, min=-self.eps, max=self.eps)
+            # update adverserial input, with norm
             x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
-
+        # return pertubation
         return x_adv - Xs
 
 
@@ -114,20 +147,34 @@ class FGSMAttack():
         self.num_classes = num_classes
         self.norm = norm
 
-    def perturb(self, model: nn.Module, Xs, ys):
+    def perturb(self, model: nn.Module, Xs: torch.float, ys: torch.int):
+        """
+        model: resnet18
+        Xs: data - image input, shape: bs 3 32 32  
+        ys: attack_labels. (targeted=1)
+        """
+
         Xs = Xs.clone()
+        # set grad to orignal data/input
         Xs.requires_grad=True
+        # set model eval
         model.zero_grad()
 
+        # logits is the output of model with adverserial input
+        # logits shape: bs x c [64,10]
         logits = model(Xs)
 
+        # ce loss, compare confidence score with attack label 
         loss = F.cross_entropy(logits, ys)
         if self.targeted:
             loss = -loss
 
         loss.backward()
-        x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()    
-        x_adv = torch.clamp(x_adv, min=0, max=1).detach()
 
+        # update adverserial input with original data and grad
+        x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()  
+        # norm  
+        x_adv = torch.clamp(x_adv, min=0, max=1).detach()
+        # return pertubation 
         return x_adv - Xs 
 
