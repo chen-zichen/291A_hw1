@@ -136,7 +136,6 @@ class PGDAttack():
         return x_adv
 
 
-
 ### FGSMAttack
 '''
 Theoretically you can transform your PGDAttack to FGSM Attack by controling some of its parameters like `attack_step`. 
@@ -175,15 +174,11 @@ class FGSMAttack():
         loss.backward()
 
         # update adverserial input with original data and grad
-        # delta = -eps * sign(grad)
         # pertubated data =  original + delta
-        # x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()  
         x_adv = Xs + self.eps * Xs.grad.sign()  
         
         # norm  
-        # x_adv = torch.clamp(x_adv, min=0, max=1).detach()
         x_adv = torch.clamp(x_adv, min=0, max=1)
-        # x_adv.grad.zero_()
         
         # return pertubation 
         return x_adv
