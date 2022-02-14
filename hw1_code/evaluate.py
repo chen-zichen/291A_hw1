@@ -88,7 +88,7 @@ for data, labels in tqdm(test_loader):
         # with torch.no_grad():  --> no grad for all
         # generate perturbation
         # perturb + original data (image)
-        perturbed_data = attacker.perturb(model, data, attack_labels) + data
+        perturbed_data = attacker.perturb(model, data, attack_labels)
 
         # clean model acc
         predictions = model(data)

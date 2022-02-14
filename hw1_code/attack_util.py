@@ -100,19 +100,22 @@ class PGDAttack():
         Xs: data - image input, shape: bs 3 32 32  
         ys: attack_labels. (targeted=1)
         """
-        # delta: pertubation, shape: bs 3 32 32, proj to [-eps,eps]
-        # sampled from the continuous uniform distribution
+        # delta: pertubation, shape: bs 3 32 32, range [-eps,eps]
         delta = torch.empty_like(Xs).uniform_(-self.eps, self.eps)
 
-        # x_adv: adverserial input, clamp
-        x_adv = torch.clamp(Xs + delta, min=0, max=1)
-        x_adv.requires_grad = True
+        # x_adv: adverserial input, norm
+        x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
 
         for _ in range(self.attack_step):
-            # logits is the output of model with adverserial input，confidence score
+            # set x_adv grad
+            x_adv.requires_grad = True
+            # eval model
+            model.zero_grad()
+            # logits is the output of model with adverserial input
             # logits shape: bs x c [64,10]
             logits = model(x_adv)
             
+
             # Calculate loss
             if self.loss_type == 'ce':
                 loss = self.ce_loss(logits, ys)
@@ -120,21 +123,17 @@ class PGDAttack():
                 loss = self.cw_loss(logits, ys)
             else: 
                 raise NotImplementedError
-            loss.backward(retain_graph = True)
+            loss.backward()
 
             # update adverserial input with adverserial input grad sign
-            # update: delta_new = detal_old - \alpha * grad(x_adv)
-            # x_adv = Xs + delta_new = Xs + detal_old - \alpha * grad(x_adv) = x_adv - \alpha * grad(x_adv)
-            x_adv = x_adv - self.alpha*x_adv.grad.sign()
+            x_adv = x_adv.detach() - self.alpha*x_adv.grad.sign()
             
-            # keep in bound
+            # update pertubation delta, min(delta), with norm
             delta = torch.clamp(x_adv - Xs, min=-self.eps, max=self.eps)
             # update adverserial input, with norm
-            x_adv = torch.clamp(Xs + delta, min=0, max=1)
-            x_adv.grad.zero_()
-
+            x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
         # return pertubation
-        return x_adv - Xs
+        return x_adv
 
 
 
@@ -178,9 +177,14 @@ class FGSMAttack():
         # update adverserial input with original data and grad
         # delta = -eps * sign(grad)
         # pertubated data =  original + delta
-        x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()  
+        # x_adv = Xs.detach() + self.eps * Xs.grad.sign().detach()  
+        x_adv = Xs + self.eps * Xs.grad.sign()  
+        
         # norm  
-        x_adv = torch.clamp(x_adv, min=0, max=1).detach()
+        # x_adv = torch.clamp(x_adv, min=0, max=1).detach()
+        x_adv = torch.clamp(x_adv, min=0, max=1)
+        # x_adv.grad.zero_()
+        
         # return pertubation 
-        return x_adv - Xs 
+        return x_adv
 
