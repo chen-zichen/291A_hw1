@@ -1,0 +1,3 @@
+
+resnet_cifar10.pth, 8.0, 2.0, 10, ce, fgsm False, target True
+total 9000, correct 8502, adversarial correct 159, clean accuracy 0.9446666666666667, robust accuracy 0.017666666666666667
