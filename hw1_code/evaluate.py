@@ -102,3 +102,10 @@ for data, labels in tqdm(test_loader):
         robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
 print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+# save output to txt
+save_path = './output/'
+with open(save_path + 'output.txt', 'w') as f:
+    f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
+    f.write(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+    f.close()
+print("Output saved")
