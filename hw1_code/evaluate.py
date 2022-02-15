@@ -20,6 +20,7 @@ parser.add_argument('--model_name', default='resnet_cifar10.pth',
                     help='File folders where you want to store your checkpoints')
 parser.add_argument("--fgsm", action = 'store_true')
 parser.add_argument("--targeted", action = 'store_true')
+parser.add_argument("--noattack", action = 'store_true')
 args = parser.parse_args()
 
 device = torch.device(0) if torch.cuda.is_available() else torch.device("cpu")
@@ -41,6 +42,7 @@ alpha = args.alpha / 255.
 fgsm = args.fgsm
 loss_type = args.loss_type
 targeted = args.targeted
+noattack = args.noattack
 
 # initial attacker
 if args.fgsm:
@@ -88,7 +90,10 @@ for data, labels in tqdm(test_loader):
         # with torch.no_grad():  --> no grad for all
         # generate perturbation
         # perturb + original data (image)
-        perturbed_data = attacker.perturb(model, data, attack_labels)
+        if noattack:
+            pass 
+        else:
+            perturbed_data = attacker.perturb(model, data, attack_labels)
 
         # clean model acc
         predictions = model(data)
@@ -96,10 +101,13 @@ for data, labels in tqdm(test_loader):
         # argmax keep the bs x 1 to match the 'real labels', the highest prob. shape bs x 1
         clean_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
-        # robust acc 
-        # test perturbed image
-        predictions = model(perturbed_data)
-        robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+        if noattack:
+            robust_correct_num = 0.
+        else:
+            # robust acc 
+            # test perturbed image
+            predictions = model(perturbed_data)
+            robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
 print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
 # save output to txt

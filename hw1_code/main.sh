@@ -1,6 +1,6 @@
 # 1. test standard model and robust model
-python3 evaluate.py --model_name resnet_cifar10.pth
-python3 evaluate.py --model_name pgd10_eps8.pth
+python3 evaluate.py --model_name resnet_cifar10.pth --noattack
+python3 evaluate.py --model_name pgd10_eps8.pth --noattack
 
 # standard model version
 # 2. fgsm + untargeted ce
