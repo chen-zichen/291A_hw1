@@ -13,7 +13,7 @@ python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 10
 python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 10 --loss_type cw
 
 # 5. pgd + targeted cw + t=10
-python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 1 --loss_type cw --targeted
+python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 10 --loss_type cw --targeted
 
 # 6. pgd + ce + different settings... example
 python3 evaluate.py --model_name resnet_cifar10.pth --attack_step 20 --loss_type ce 

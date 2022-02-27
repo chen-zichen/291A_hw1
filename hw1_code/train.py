@@ -1,5 +1,5 @@
-from cProfile import label
 import torch
+from torch import nn, optim
 import data_util
 import model_util
 import attack_util
@@ -35,6 +35,10 @@ model.load(model_path)
 
 model = model.to(device)
 
+loss_func = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+
 # set params
 attack_step = args.attack_step
 eps = args.eps / 255.
@@ -60,7 +64,7 @@ target_label = 1 # only for targeted attack
 
 
 ## Make sure the model is in `eval` mode. Otherwise some operations such as dropout will  
-model.eval()
+# model.eval()
 for data, labels in tqdm(test_loader):
     data = data.float().to(device)
     # label shape: bs
@@ -80,34 +84,30 @@ for data, labels in tqdm(test_loader):
     else:
         attack_labels = labels
     attack_labels = attack_labels.to(device)
+
     # get batch size
     batch_size = data.size(0)
 
     # for final calculation 
     total += batch_size
+
+
     with ctx_noparamgrad(model):
-        # no grad only for the model, keep the grad for input
-        # with torch.no_grad():  --> no grad for all
-        # generate perturbation
-        # perturb + original data (image)
         if noattack:
             pass 
         else:
             perturbed_data = attacker.perturb(model, data, attack_labels)
 
-        # clean model acc
-        predictions = model(data)
-        # predictions shape bs x c
-        # argmax keep the bs x 1 to match the 'real labels', the highest prob. shape bs x 1
-        clean_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+    
+    # training
+    predictions = model(perturbed_data)
+    loss = loss_func(predictions, labels)
 
-        if noattack:
-            robust_correct_num = 0.
-        else:
-            # robust acc 
-            # test perturbed image
-            predictions = model(perturbed_data)
-            robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    print(loss)
+
 
 print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
 # save output to txt
