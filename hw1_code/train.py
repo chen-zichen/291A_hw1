@@ -48,6 +48,8 @@ loss_type = args.loss_type
 targeted = args.targeted
 noattack = args.noattack
 
+epoch = 10
+
 # initial attacker
 if args.fgsm:
     attacker = attack_util.FGSMAttack(eps = eps, loss_type = loss_type, targeted = targeted, num_classes = num_classes, norm = 'linf')
@@ -64,52 +66,66 @@ target_label = 1 # only for targeted attack
 
 
 ## Make sure the model is in `eval` mode. Otherwise some operations such as dropout will  
-# model.eval()
-for data, labels in tqdm(test_loader):
-    data = data.float().to(device)
-    # label shape: bs
-    labels = labels.to(device)
-    
-    if targeted:
-        # data_mask shape = data shape / bs
-        # classify all the data to target label
-        data_mask = (labels != target_label)
-        # data shape: bs 3 32 32 
-        # mask data, collect the data that is not in the targeted class
-        data = data[data_mask]
-        labels = labels[data_mask]
-        # copy label shape 
-        # set others label = 1 
-        attack_labels = torch.ones_like(labels).to(device)
-    else:
-        attack_labels = labels
-    attack_labels = attack_labels.to(device)
 
-    # get batch size
-    batch_size = data.size(0)
-
-    # for final calculation 
-    total += batch_size
-
-
-    with ctx_noparamgrad(model):
-        if noattack:
-            pass 
+for ep in tqdm(range(epoch)):
+    for data, labels in tqdm(train_loader):
+        data = data.float().to(device)
+        labels = labels.to(device)
+        if targeted:
+            data_mask = (labels != target_label)
+            data = data[data_mask]
+            labels = labels[data_mask]
+            attack_labels = torch.ones_like(labels).to(device)
         else:
-            perturbed_data = attacker.perturb(model, data, attack_labels)
+            attack_labels = labels
+        attack_labels = attack_labels.to(device)
+        batch_size = data.size(0)
+        total += batch_size
 
-    
-    # training
-    predictions = model(perturbed_data)
-    loss = loss_func(predictions, labels)
+        with ctx_noparamgrad(model):
+            if noattack:
+                pass 
+            else:
+                perturbed_data = attacker.perturb(model, data, attack_labels)
+        
+        # training
+        predictions = model(perturbed_data)
+        loss = loss_func(predictions, labels)
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-    print(loss)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print(loss)
+
+    # eval 
+    for data, labels in tqdm(valid_loader):
+        data = data.float().to(device)
+        labels = labels.to(device)
+        if targeted:
+            data_mask = (labels != target_label)
+            data = data[data_mask]
+            labels = labels[data_mask]
+            attack_labels = torch.ones_like(labels).to(device)
+        else:
+            attack_labels = labels
+        attack_labels = attack_labels.to(device)
+        batch_size = data.size(0)
+        total += batch_size
+
+        with ctx_noparamgrad(model):
+            # clean model acc
+            predictions = model(data)
+            clean_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+            if noattack:
+                robust_correct_num = 0.
+            else:
+                # robust acc
+                perturbed_data = attacker.perturb(model, data, attack_labels) 
+                predictions = model(perturbed_data)
+                robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
 
-print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+        print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
 # save output to txt
 save_path = 'output/'
 with open(save_path + 'eps.txt', 'a') as f:
