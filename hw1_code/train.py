@@ -37,6 +37,8 @@ model = model.to(device)
 
 loss_func = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+
 
 
 # set params
@@ -95,7 +97,7 @@ for ep in tqdm(range(epoch)):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(loss)
+        scheduler.step()
 
     # eval 
     for data, labels in tqdm(valid_loader):
@@ -124,12 +126,11 @@ for ep in tqdm(range(epoch)):
                 predictions = model(perturbed_data)
                 robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
-
-        print(f"total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
-# save output to txt
-save_path = 'output/'
-with open(save_path + 'eps.txt', 'a') as f:
-    f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
-    f.writelines(f"\ntotal {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
-    f.close()
+    print(f"epoch {epoch}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+    # save output to txt
+    save_path = 'output/'
+    with open(save_path + 'hw2/q1.txt', 'a') as f:
+        f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
+        f.writelines(f"\ntotal {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+        f.close()
 print("Output saved")
