@@ -37,7 +37,9 @@ model = model.to(device)
 
 loss_func = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+# scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
+
 
 
 
@@ -137,3 +139,20 @@ for ep in tqdm(range(epoch)):
         f.writelines(f"\n epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
         f.close()
 print("Output saved")
+
+
+def epoch(loader, model, opt=None, sch=None):
+    total_loss, total_err = 0.,0.
+    for X,y in loader:
+        X,y = X.to(device), y.to(device)
+        yp = model(X)
+        loss = nn.CrossEntropyLoss()(yp,y)
+        if opt and sch:
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            sch.step()
+        
+        total_err += (yp.max(dim=1)[1] != y).sum().item()
+        total_loss += loss.item() * X.shape[0]
+    return total_err / len(loader.dataset), total_loss / len(loader.dataset)
