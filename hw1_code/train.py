@@ -129,11 +129,11 @@ for ep in tqdm(range(epoch)):
                 predictions = model(perturbed_data)
                 robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
-    print(f"epoch {epoch}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+    print(f"epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
     # save output to txt
     save_path = 'output/'
     with open(save_path + 'hw2/q1.txt', 'a') as f:
         f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
-        f.writelines(f"\n epoch {epoch}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+        f.writelines(f"\n epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
         f.close()
 print("Output saved")
