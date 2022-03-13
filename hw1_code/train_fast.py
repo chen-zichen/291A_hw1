@@ -16,7 +16,7 @@ parser.add_argument("--loss_type", type = str, default = "ce", choices = ['ce','
 parser.add_argument('--data_dir', default='./data/', type=str, help="The folder where you store your dataset")
 parser.add_argument('--model_prefix', default='./checkpoints/',
                     help='File folders where you want to store your checkpoints')
-parser.add_argument('--model_name', default='resnet_cifar10.pth',
+parser.add_argument('--model_name', default='pgd10_eps8.pth',
                     help='File folders where you want to store your checkpoints')
 parser.add_argument("--fgsm", action = 'store_true')
 parser.add_argument("--targeted", action = 'store_true')
@@ -30,8 +30,8 @@ num_classes = 10
 # load model
 model = model_util.ResNet18(num_classes = num_classes)
 model.normalize = norm_layer  # Normalize by channel mean std
-model_path = args.model_prefix + args.model_name
-model.load(model_path)
+# model_path = args.model_prefix + args.model_name
+# model.load(model_path)
 
 model = model.to(device)
 
@@ -134,7 +134,7 @@ for ep in tqdm(range(epoch)):
     print(f"epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
     # save output to txt
     save_path = 'output/'
-    with open(save_path + 'hw2/q2.txt', 'a') as f:
+    with open(save_path + 'hw2/q2-test.txt', 'a') as f:
         f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
         f.writelines(f"\n epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
         f.close()
