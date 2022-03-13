@@ -34,11 +34,14 @@ model.normalize = norm_layer  # Normalize by channel mean std
 # model.load(model_path)
 
 model = model.to(device)
+epoch = 50
 
 loss_func = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.01)
-# scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+lr_steps = epoch * len(train_loader)
+scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0., max_lr=.2,
+            step_size_up=lr_steps / 2, step_size_down=lr_steps / 2, cycle_momentum=False)
+# scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
 
 
 
@@ -52,7 +55,6 @@ loss_type = args.loss_type
 targeted = args.targeted
 noattack = args.noattack
 
-epoch = 50
 
 # initial attacker
 if args.fgsm:
