@@ -30,8 +30,8 @@ num_classes = 10
 # load model
 model = model_util.ResNet18(num_classes = num_classes)
 model.normalize = norm_layer  # Normalize by channel mean std
-# model_path = args.model_prefix + args.model_name
-# model.load(model_path)
+model_path = args.model_prefix + args.model_name
+model.load(model_path)
 
 model = model.to(device)
 epoch = 50
@@ -39,9 +39,9 @@ epoch = 50
 loss_func = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 lr_steps = epoch * len(train_loader)
-scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0., max_lr=.2,
-            step_size_up=lr_steps / 2, step_size_down=lr_steps / 2, cycle_momentum=False)
-# scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
+# scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0., max_lr=.2,
+            # step_size_up=lr_steps / 2, step_size_down=lr_steps / 2, cycle_momentum=False)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
 
 
 
@@ -75,6 +75,8 @@ target_label = 1 # only for targeted attack
 
 for ep in tqdm(range(epoch)):
     avg_loss = 0
+    train_acc = 0
+    train_n = 0
     for data, labels in tqdm(train_loader):
         data = data.float().to(device)
         labels = labels.to(device)
@@ -89,14 +91,10 @@ for ep in tqdm(range(epoch)):
         batch_size = data.size(0)
         total += batch_size
 
-        with ctx_noparamgrad(model):
-            if noattack:
-                pass 
-            else:
-                perturbed_data = attacker.perturb(model, data, attack_labels)
-        
+        perturbed_data = attacker.perturb(model, data, attack_labels)
+        perturbed_data.detach()
         # training
-        predictions = model(perturbed_data)
+        predictions = model(perturbed_data + data)
         loss = loss_func(predictions, labels)
 
         optimizer.zero_grad()
@@ -104,41 +102,44 @@ for ep in tqdm(range(epoch)):
         optimizer.step()
         scheduler.step()
 
-    avg_loss += loss/batch_size
+    train_acc += (predictions.max(1)[1] == labels).sum().item()
+    train_n += labels.size(0)
+    print(epoch, train_acc/train_n)
+
 
     # eval 
-    for data, labels in tqdm(valid_loader):
-        data = data.float().to(device)
-        labels = labels.to(device)
-        if targeted:
-            data_mask = (labels != target_label)
-            data = data[data_mask]
-            labels = labels[data_mask]
-            attack_labels = torch.ones_like(labels).to(device)
-        else:
-            attack_labels = labels
-        attack_labels = attack_labels.to(device)
-        batch_size = data.size(0)
-        total += batch_size
+    # for data, labels in tqdm(valid_loader):
+    #     data = data.float().to(device)
+    #     labels = labels.to(device)
+    #     if targeted:
+    #         data_mask = (labels != target_label)
+    #         data = data[data_mask]
+    #         labels = labels[data_mask]
+    #         attack_labels = torch.ones_like(labels).to(device)
+    #     else:
+    #         attack_labels = labels
+    #     attack_labels = attack_labels.to(device)
+    #     batch_size = data.size(0)
+    #     total += batch_size
 
-        with ctx_noparamgrad(model):
-            # clean model acc
-            predictions = model(data)
-            clean_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
-            if noattack:
-                robust_correct_num = 0.
-            else:
-                # robust acc
-                perturbed_data = attacker.perturb(model, data, attack_labels) 
-                predictions = model(perturbed_data)
-                robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+    #     with ctx_noparamgrad(model):
+    #         # clean model acc
+    #         predictions = model(data)
+    #         clean_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
+    #         if noattack:
+    #             robust_correct_num = 0.
+    #         else:
+    #             # robust acc
+    #             perturbed_data = attacker.perturb(model, data, attack_labels) 
+    #             predictions = model(perturbed_data)
+    #             robust_correct_num += torch.sum(torch.argmax(predictions, dim = 1) == labels).item()
 
-    print(f"epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
-    # save output to txt
-    save_path = 'output/'
-    with open(save_path + 'hw2/q2-test.txt', 'a') as f:
-        f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
-        f.writelines(f"\n epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
-        f.close()
+    # print(f"epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+    # # save output to txt
+    # save_path = 'output/'
+    # with open(save_path + 'hw2/q2-cos.txt', 'a') as f:
+    #     f.writelines(f"\n{args.model_name}, {args.eps}, {args.alpha}, {args.attack_step}, {args.loss_type}, fgsm {args.fgsm}, target {args.targeted}")
+    #     f.writelines(f"\n epoch {ep}, loss {avg_loss}, total {total}, correct {clean_correct_num}, adversarial correct {robust_correct_num}, clean accuracy {clean_correct_num / total}, robust accuracy {robust_correct_num / total}")
+    #     f.close()
 print("Output saved")
 

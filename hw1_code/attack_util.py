@@ -130,10 +130,10 @@ class PGDAttack():
             
             # update pertubation delta, min(delta), with norm
             delta = torch.clamp(x_adv - Xs, min=-self.eps, max=self.eps)
-            # update adverserial input, with norm
-            x_adv = torch.clamp(Xs + delta, min=0, max=1).detach()
+            delta.requires_grad = True
+            # x_adv = torch.clamp(Xs + delta, min=0, max=1)
         # return pertubation
-        return x_adv
+        return delta
 
 
 ### FGSMAttack

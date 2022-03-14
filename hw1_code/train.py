@@ -52,7 +52,7 @@ loss_type = args.loss_type
 targeted = args.targeted
 noattack = args.noattack
 
-epoch = 10
+epoch = 50
 
 # initial attacker
 if args.fgsm:
@@ -87,11 +87,12 @@ for ep in tqdm(range(epoch)):
         batch_size = data.size(0)
         total += batch_size
 
-        with ctx_noparamgrad(model):
-            if noattack:
-                pass 
-            else:
-                perturbed_data = attacker.perturb(model, data, attack_labels)
+        # with ctx_noparamgrad(model):
+        #     if noattack:
+        #         pass 
+        #     else:
+        #         
+        perturbed_data = attacker.perturb(model, data, attack_labels)
         
         # training
         predictions = model(perturbed_data)
